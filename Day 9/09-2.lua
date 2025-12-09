@@ -1,16 +1,45 @@
-local function findLargestRectangle(tiles)
-	local area = 0
+local function findLargestRectangle(area)
+	local largestRectangle = 0
 
-	for i = 1, #tiles - 1 do
-		for j = i, #tiles do
-			local x = math.abs(tiles[i]["x"] - tiles[j]["x"]) + 1
-			local y = math.abs(tiles[i]["y"] - tiles[j]["y"]) + 1
+	for row = 1, #area do
+		for tile = 1, #area[row][1] do
+			local x = area[row][1][tile]
 
-			area = math.max(x * y, area)
+			if x == nil then
+				goto continue
+			end
+
+			for nextRow = row, #area do
+				for nextTile = 1, #area[nextRow][1] do
+					local nextX = area[nextRow][1][nextTile]
+
+					if nextX ~= nil then
+						local minX = math.min(x, nextX)
+						local maxX = math.max(x, nextX)
+
+						local validRect = true
+						for checkRow = row, nextRow do
+							if
+								area[checkRow][2][1] == -1
+								or minX < area[checkRow][2][1]
+								or maxX > area[checkRow][2][2]
+							then
+								validRect = false
+								break
+							end
+						end
+
+						if validRect then
+							largestRectangle = math.max(largestRectangle, ((maxX - minX + 1) * (nextRow - row + 1)))
+						end
+					end
+				end
+			end
+			::continue::
 		end
 	end
 
-	return area
+	return largestRectangle
 end
 
 local function getRedTiles(file)
@@ -28,20 +57,20 @@ local function getRedTiles(file)
 		table.insert(tiles, tile)
 	end
 
-	table.sort(tiles, function(a, b)
-		return a[2] > b[2]
-	end)
-
 	return tiles
 end
 
 local function getValidArea(tiles)
 	local validArea = {}
-	local min = tiles[1]["y"]
-	local max = tiles[#tiles]["y"]
+	local minRows = 1
+	local maxRows = math.mininteger
 
-	for i = min, max do
-		table.insert(validArea, { {}, {} })
+	for i = 1, #tiles do
+		maxRows = math.max(maxRows, tiles[i]["y"])
+	end
+
+	for y = minRows, maxRows do
+		validArea[y] = { {}, { -1, -1 } }
 	end
 
 	for i = 1, #tiles do
@@ -49,19 +78,34 @@ local function getValidArea(tiles)
 		local y = tiles[i]["y"]
 
 		table.insert(validArea[y][1], x)
-		table.insert(validArea[y][2], x)
 
-		validArea[y][2] = { math.min(validArea[y][2], x), math.max(validArea[y][2], x) }
+		if validArea[y][2][1] == -1 then
+			validArea[y][2] = { x, x }
+		else
+			validArea[y][2] = {
+				math.min(validArea[y][2][1], x),
+				math.max(validArea[y][2][2], x),
+			}
+		end
 	end
 
-	for i = 1, #validArea do
-		for j = 1, #validArea[i] do
-			for k = i, #validArea do
-				if validArea[i][k] == validArea[i][j] then
-					for l = j, k do
-						validArea[l][2] =
-							{ math.min(validArea[l][2], validArea[i][k]), math.max(validArea[l][2], validArea[i][k]) }
-					end
+	for i = 1, #tiles do
+		local nextI = (i % #tiles) + 1
+		local x1, y1 = tiles[i]["x"], tiles[i]["y"]
+		local x2, y2 = tiles[nextI]["x"], tiles[nextI]["y"]
+
+		if x1 == x2 and y1 ~= y2 then
+			local minRow = math.min(y1, y2)
+			local maxRow = math.max(y1, y2)
+
+			for row = minRow, maxRow do
+				if validArea[row][2][1] == -1 then
+					validArea[row][2] = { x1, x1 }
+				else
+					validArea[row][2] = {
+						math.min(validArea[row][2][1], x1),
+						math.max(validArea[row][2][2], x1),
+					}
 				end
 			end
 		end
@@ -72,14 +116,15 @@ end
 
 local function main()
 	local file = io.open("input.txt", "r")
-	local area = 0
+	local largestRectangle = 0
 
 	if file then
 		local redTiles = getRedTiles(file)
-		area = findLargestRectangle(redTiles)
+		local area = getValidArea(redTiles)
+		largestRectangle = findLargestRectangle(area)
 	end
 
-	return area
+	return largestRectangle
 end
 
 print(main())
